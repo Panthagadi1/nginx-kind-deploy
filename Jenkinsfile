@@ -1,53 +1,27 @@
 pipeline {
-    agent any
-
-    environment {
-        DOCKER_CREDENTIALS_ID = 'your-docker-hub-credentials-id' // Update with Docker credentials ID
-        GITHUB_CREDENTIALS_ID = 'your-github-ssh-credentials-id' // Update with GitHub SSH credentials ID
-        DOCKER_IMAGE = 'Panthagadi1/nginx-deploy'
-    }
-
+    agent { label 'my-docker-agent' }  // Replace 'my-docker-agent' with your node label
     stages {
-        stage('Clone Repository') {
+        stage('Checkout Code') {
             steps {
-                git credentialsId: "${GITHUB_CREDENTIALS_ID}", url: 'git@github.com:Panthagadi1/nginx-kind-deploy.git'
+                git 'git@github.com:Panthagadi1/nginx-kind-deploy.git'
             }
         }
-
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t ${DOCKER_IMAGE} .'
+                sh 'docker build -t my-nginx-app .'
             }
         }
-
-        stage('Login to Docker Hub') {
+        stage('Push to Docker Hub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                withDockerRegistry([credentialsId: 'docker-hub-credentials', url: '']) {
+                    sh 'docker push my-nginx-app:latest'
                 }
             }
         }
-
-        stage('Push Image to Docker Hub') {
-            steps {
-                sh 'docker push ${DOCKER_IMAGE}'
-            }
-        }
-
         stage('Deploy to Docker Container') {
             steps {
-                sh 'docker stop nginx-container || true && docker rm nginx-container || true'
-                sh 'docker run -d -p 80:80 --name nginx-container ${DOCKER_IMAGE}'
+                sh 'docker run -d -p 80:80 my-nginx-app'
             }
-        }
-    }
-
-    post {
-        success {
-            echo 'Deployment Successful! 🚀'
-        }
-        failure {
-            echo 'Deployment Failed ❌'
         }
     }
 }
